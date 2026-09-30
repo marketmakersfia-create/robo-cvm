@@ -1,0 +1,57 @@
+name: Robô CVM → Telegram
+
+on:
+  schedule:
+    # GitHub usa horário UTC (Brasília = UTC-3). Resultado: a cada 10 min, das 7h às 23h de Brasília.
+    - cron: "*/10 10-23 * * *"   # 07h00 – 20h50 (Brasília)
+    - cron: "*/10 0-1 * * *"     # 21h00 – 22h50 (Brasília)
+    - cron: "0 2 * * *"          # 23h00 (Brasília)
+  workflow_dispatch:             # botão "Run workflow" para rodar na hora
+    inputs:
+      modo:
+        description: "normal = checa a CVM agora | teste = manda mensagem de teste com a carteira"
+        type: choice
+        default: normal
+        options: [normal, teste]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: robo-cvm
+  cancel-in-progress: false
+
+jobs:
+  checar-cvm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Recupera a "memória" (o que já foi enviado) da execução anterior
+      - uses: actions/cache/restore@v4
+        with:
+          path: estado
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+
+      - name: Rodar o robô
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PLANILHA_URL: ${{ secrets.PLANILHA_URL }}
+        run: python robo.py ${{ inputs.modo == 'teste' && '--teste' || '' }}
+
+      # Guarda a memória atualizada para a próxima execução
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: estado
+          key: estado-${{ github.run_id }}-${{ github.run_attempt }}

@@ -1,0 +1,19 @@
+name: Manter robô ativo
+
+# O GitHub desliga agendamentos de repositórios sem atividade por 60 dias.
+# Este passo mensal reativa o robô automaticamente para isso nunca acontecer.
+on:
+  schedule:
+    - cron: "17 12 1 * *"   # dia 1 de cada mês
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  reativar:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/robo-cvm.yml/enable"
